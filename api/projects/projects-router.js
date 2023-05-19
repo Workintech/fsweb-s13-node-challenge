@@ -4,59 +4,71 @@ const projectsModel = require("./projects-model.js");
 const mw = require("./projects-middleware.js");
 
 const router = express.Router();
-router.use(express.json());
 
-router.get("/", (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
-    const projects = projectsModel.get();
-    res.status(200).json(projects || []);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to get projects" });
+    const allProjects = await projectsModel.get();
+    res.json(allProjects || []);
+  } catch (error) {
+    next(error);
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", mw.validateProjectId, (req, res, next) => {
   try {
-    const project = await projectsModel.get(req.params.id);
-    res.status(200).json(project);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to get projects" });
+    res.json(req.currentProject);
+  } catch (error) {
+    next(error);
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", mw.validateProjectPayload, async (req, res, next) => {
   try {
-    const project = await projectsModel.insert(req.body);
-    res.status(201).json(project);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to create new project" });
+    let model = {
+      name: req.body.name,
+      description: req.body.description,
+      completed: req.body.completed,
+    };
+    const inserted = await projectsModel.insert(model);
+    res.status(201).json(inserted);
+  } catch (error) {
+    next(error);
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put(
+  "/:id",
+  mw.validateProjectId,
+  mw.validateProjectPayload,
+  async (req, res, next) => {
+    try {
+      let model = {
+        name: req.body.name,
+        description: req.body.description,
+        completed: req.body.completed,
+      };
+      const updated = await projectsModel.update(req.params.id, model);
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.delete("/:id", mw.validateProjectId, async (req, res, next) => {
   try {
-    const project = await projectsModel.update(req.params.id, req.body);
-    res.status(200).json(project);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to update project" });
+    await projectsModel.remove(req.params.id);
+    res.json({ message: "Silme işlemi başarılı" });
+  } catch (error) {
+    next(error);
   }
 });
-
-router.delete("/:id", async (req, res) => {
+router.get("/:id/actions", mw.validateProjectId, async (req, res, next) => {
   try {
-    const project = await projectsModel.remove(req.params.id);
-    res.status(200).json(project);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to delete project" });
-  }
-});
-
-router.get("/:id/actions", async (req, res) => {
-  try {
-    const actions = await projectsModel.getProjectActions(req.params.id);
-    res.status(200).json(actions);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to get actions" });
+    const projectActions = await projectsModel.getProjectActions(req.params.id);
+    res.json(projectActions);
+  } catch (error) {
+    next(error);
   }
 });
 

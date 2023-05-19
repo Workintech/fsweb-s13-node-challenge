@@ -1,54 +1,63 @@
 // "eylem" routerını buraya yazın
-const express = require("express");
-const actionsRouter = express.Router();
-const actionsModel = require("./actions-model.js");
+const router = require("express").Router();
+const actionsModel = require("./actions-model");
+const mw = require("./actions-middlware");
 
-const router = express.Router();
-router.use(express.json());
-
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
-    const actions = await actionsModel.get();
-    res.status(200).json(actions || []);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to get actions" });
+    const allActions = await actionsModel.get();
+    res.json(allActions || []);
+  } catch (error) {
+    next(error);
+  }
+});
+router.get("/:id", mw.validateActionId, (req, res, next) => {
+  try {
+    res.json(req.currentAction);
+  } catch (error) {
+    next(error);
+  }
+});
+router.post("/", mw.validateActionPayload, async (req, res, next) => {
+  try {
+    let model = {
+      project_id: req.body.project_id,
+      notes: req.body.notes,
+      description: req.body.description,
+      completed: req.body.completed,
+    };
+    const insertedAction = await actionsModel.insert(model);
+    res.status(201).json(insertedAction);
+  } catch (error) {
+    next(error);
+  }
+});
+router.put(
+  "/:id",
+  mw.validateActionId,
+  mw.validateActionPayload,
+  async (req, res, next) => {
+    try {
+      let model = {
+        project_id: req.body.project_id,
+        notes: req.body.notes,
+        description: req.body.description,
+        completed: req.body.completed,
+      };
+      const updatedAction = await actionsModel.update(req.params.id, model);
+      res.json(updatedAction);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+router.delete("/:id", mw.validateActionId, async (req, res, next) => {
+  try {
+    await actionsModel.remove(req.params.id);
+    res.json({ message: "Silme işlemi başarılı" });
+  } catch (error) {
+    next(error);
   }
 });
 
-router.get("/:id", async (req, res) => {
-  try {
-    const action = await actionsModel.get(req.params.id);
-    res.status(200).json(action);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to get actions" });
-  }
-});
-
-router.post("/", async (req, res) => {
-  try {
-    const action = await actionsModel.insert(req.body);
-    res.status(201).json(action);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to create new action" });
-  }
-});
-
-router.put("/:id", async (req, res) => {
-  try {
-    const action = await actionsModel.update(req.params.id, req.body);
-    res.status(200).json(action);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to update action" });
-  }
-});
-
-router.delete("/:id", async (req, res) => {
-  try {
-    const action = await actionsModel.remove(req.params.id);
-    res.status(200).json(action);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to delete action" });
-  }
-});
-
-module.exports = actionsRouter;
+module.exports = router;
